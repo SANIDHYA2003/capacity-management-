@@ -1520,9 +1520,10 @@ function initLeafletMap() {
   const container = document.getElementById('store-map');
   if (!container) return;
 
-  // Initialize Map center-focused on India
+  // Initialize Map center-focused on India (with default Leaflet zoomControl disabled)
   mapInstance = L.map('store-map', {
-    scrollWheelZoom: false
+    scrollWheelZoom: false,
+    zoomControl: false
   }).setView([20.5937, 78.9629], 5);
 
   // Trigger invalidate size so Leaflet fits the new wider scrollable dimensions
@@ -1536,6 +1537,16 @@ function initLeafletMap() {
     subdomains: 'abcd',
     maxZoom: 19
   }).addTo(mapInstance);
+
+  // Bind Custom Floating Zoom Controls
+  const zoomInBtn = document.getElementById('btn-zoom-in');
+  const zoomOutBtn = document.getElementById('btn-zoom-out');
+  if (zoomInBtn) {
+    zoomInBtn.onclick = () => mapInstance.zoomIn();
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.onclick = () => mapInstance.zoomOut();
+  }
 
   // Map click listener for sandbox mode
   mapInstance.on('click', (e) => {
@@ -1592,33 +1603,7 @@ function initLeafletMap() {
   const bounds = L.latLngBounds(hubCoords);
   mapInstance.fitBounds(bounds, { padding: [50, 50] });
 
-  // Define and add Floating Custom Sandbox Control in the top-right corner
-  const SandboxControl = L.Control.extend({
-    options: {
-      position: 'topright'
-    },
-    onAdd: function(map) {
-      const div = L.DomUtil.create('div', 'leaflet-sandbox-control-panel');
-      div.style.pointerEvents = 'auto'; // ensure mouse clicks inside are intercepted by Leaflet DOM
-      div.innerHTML = `
-        <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); padding: 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0; min-width: 220px; font-family: 'Outfit', sans-serif;">
-          <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">🛠️ Sandbox Hub Creator</div>
-          <button id="btn-sandbox-hub" class="btn-primary" style="background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.375rem; transition: all 0.2s; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); width: 100%;">
-            <span>🏠 Place Accommodation Hub</span>
-          </button>
-          <button id="btn-clear-sandbox" class="btn-secondary" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: none; width: 100%;">
-            Clear Custom Hubs
-          </button>
-        </div>
-      `;
-      L.DomEvent.disableClickPropagation(div);
-      return div;
-    }
-  });
-
-  mapInstance.addControl(new SandboxControl());
-
-  // Bind sandbox controls listeners
+  // Bind sandbox controls listeners (targets the absolute floating elements outside map container)
   bindSandboxControls();
 
   // Initial plot of default layers
