@@ -7,12 +7,14 @@ let activeRegions = ["Delhi", "Gurgaon", "Noida", "Faridabad", "Pune", "Navi Mum
 let globalRgEnabled = true;
 let customHubs = [];
 let sandboxModeActive = false;
+let activeTempReliefStores = new Set();
 
-// Helper to check if relief is active for a store (global toggle or custom sandbox hub coverage)
+// Helper to check if relief is active for a store (global toggle, custom sandbox hub coverage, or temporary active reliever)
 function isReliefActiveForStore(s) {
   const nameClean = s.storeName.trim().toLowerCase();
   const isCoveredByCustomHub = customHubs.some(hub => hub.members.includes(nameClean));
-  return globalRgEnabled || isCoveredByCustomHub;
+  const hasTempRelief = activeTempReliefStores.has(nameClean);
+  return globalRgEnabled || isCoveredByCustomHub || hasTempRelief;
 }
 
 // Sales Slabs Configuration & Requirements Mapping
@@ -1659,10 +1661,9 @@ function replotLeafletMap() {
     // Find associated Hub
     const associatedHub = allHubs.find(hub => hub.members.includes(nameClean));
     if (associatedHub) {
-      const isCustom = associatedHub.id.includes('custom');
-      // Draw connection polyline
+      // Draw connection polyline - always blue to match the standard hubs
       L.polyline([associatedHub.coords, [coords.lat, coords.lng]], {
-        color: isCustom ? '#ea580c' : '#3b82f6', // Orange line for custom hubs
+        color: '#3b82f6',
         weight: 1.25,
         dashArray: '3, 4',
         opacity: 0.5
@@ -1752,7 +1753,7 @@ function updateMapMarkers() {
 }
 
 // Animate a custom emoji character traveling along coordinates
-function animateTravel(startCoords, endCoords, emoji) {
+function animateTravel(startCoords, endCoords, emoji, onArrival) {
   if (!mapInstance) return;
 
   const travelIcon = L.divIcon({
@@ -1776,6 +1777,9 @@ function animateTravel(startCoords, endCoords, emoji) {
     if (currentStep >= steps) {
       clearInterval(interval);
       mapInstance.removeLayer(marker);
+      if (typeof onArrival === 'function') {
+        onArrival();
+      }
     }
   }, 35); // 1.75 seconds total travel animation time
 }
@@ -1783,15 +1787,14 @@ function animateTravel(startCoords, endCoords, emoji) {
 // Periodically run travel animations on random active cluster links (60fps coordinate slide)
 function startPeriodicTravelAnimations() {
   setInterval(() => {
-    // Only run if map is active and relief cover is globally simulated as active
-    if (!mapInstance || globalRgEnabled === false) return;
+    if (!mapInstance) return;
 
-    // Combine standard and custom hubs
-    const allHubs = [...mapHubs, ...customHubs];
-    if (allHubs.length === 0) return;
+    // Default + custom hubs if global is enabled; otherwise only custom hubs trigger actions
+    const activeHubs = globalRgEnabled ? [...mapHubs, ...customHubs] : customHubs;
+    if (activeHubs.length === 0) return;
 
     // Pick a random hub
-    const hub = allHubs[Math.floor(Math.random() * allHubs.length)];
+    const hub = activeHubs[Math.floor(Math.random() * activeHubs.length)];
     if (hub.members.length === 0) return;
 
     // Pick a random store in this hub's cluster
@@ -1800,14 +1803,30 @@ function startPeriodicTravelAnimations() {
 
     if (storeMarkerObj && storeMarkerObj.coords) {
       const storeCoords = [storeMarkerObj.coords.lat, storeMarkerObj.coords.lng];
+      const s = storeMarkerObj.store;
+      const nameClean = s.storeName.trim().toLowerCase();
 
-      // Phase 1: Reliever (🚗) travels from Hub Accommodation to Store
-      animateTravel(hub.coords, storeCoords, '🚗');
-
-      // Phase 2: After reliever arrives (2000ms delay), cash (💵) travels back to Hub representing protected sales
-      setTimeout(() => {
-        animateTravel(storeCoords, hub.coords, '💵');
-      }, 2000);
+      // Only animate if the store is not already permanently covered (to make the transition visible!)
+      const alreadyCovered = globalRgEnabled || customHubs.some(h => h.members.includes(nameClean));
+      
+      // Dispatch reliever emoji (🚗) from Hub Accommodation to Store
+      animateTravel(hub.coords, storeCoords, '🚗', () => {
+        // Triggered upon reliever arrival: better the staffing situation temporarily!
+        if (!alreadyCovered) {
+          activeTempReliefStores.add(nameClean);
+          
+          // Re-render map marker colors (transitions from Red -> Orange / Orange -> Green!)
+          updateMapMarkers();
+          animateDotsToCurrentState();
+          
+          // Hold relief coverage for 4 seconds, then return to baseline state
+          setTimeout(() => {
+            activeTempReliefStores.delete(nameClean);
+            updateMapMarkers();
+            animateDotsToCurrentState();
+          }, 4000);
+        }
+      });
     }
-  }, 4000); // Trigger a new reliever travel journey every 4 seconds
+  }, 5000); // Trigger a new reliever travel journey every 5 seconds
 }
