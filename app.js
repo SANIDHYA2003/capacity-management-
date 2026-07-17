@@ -175,34 +175,69 @@ function calculateAndRender() {
 }
 
 // Compute Company-wide KPI Numbers
+// Compute Company-wide KPI Numbers
 function computeSummaryCards() {
   const totalStores = storeData.length;
-  const totalStandard = storeData.reduce((acc, s) => acc + s.standard, 0);
-  const totalActual = storeData.reduce((acc, s) => acc + s.actual, 0);
-  const totalRg = storeData.reduce((acc, s) => acc + s.rgRequired, 0);
+  let totalStandard = 0;
+  let totalThreshold = 0;
+  let totalBareMin = 0;
+  let totalActual = 0;
+  let totalRg = 0;
   
   let belowThresholdCount = 0;
   let bareMinCount = 0;
+  
+  let criticalCrewSum = 0;
+  let bareminCrewSum = 0;
 
   storeData.forEach(s => {
-    const status = getStoreStatus(s);
-    if (status.key === 'critical' || status.key === 'baremin' || status.key === 'closed') {
+    totalStandard += s.standard;
+    totalThreshold += s.threshold;
+    totalBareMin += s.bareMinimum;
+
+    const active = isReliefActiveForStore(s);
+    const crew = active ? s.actual : Math.max(0, s.actual - 1);
+    totalActual += crew;
+    totalRg += s.rgRequired;
+
+    // Check status based on effective crew size
+    const avgThreshold = 5.4;
+    const avgBareMin = 4.3;
+
+    if (crew < avgThreshold) {
       belowThresholdCount++;
+      criticalCrewSum += crew;
     }
-    if (status.key === 'baremin') {
+    if (crew < avgBareMin) {
       bareMinCount++;
+      bareminCrewSum += crew;
     }
   });
 
+  const roundedActual = Math.round(totalActual);
+
   document.querySelector('#kpi-stores .kpi-value').textContent = totalStores;
-  document.querySelector('#kpi-standard .kpi-value').textContent = totalStandard;
-  document.querySelector('#kpi-actual .kpi-value').textContent = totalActual;
+  document.querySelector('#kpi-standard .kpi-value').textContent = Math.round(totalStandard);
+  document.getElementById('kpi-threshold-total').textContent = `${Math.round(totalThreshold)} head`;
+  document.getElementById('kpi-baremin-total').textContent = `${Math.round(totalBareMin)} head`;
+
+  document.querySelector('#kpi-actual .kpi-value').textContent = roundedActual;
   document.querySelector('#kpi-rg .kpi-value').textContent = totalRg;
+  
   document.querySelector('#kpi-critical .kpi-value').textContent = belowThresholdCount;
+  const criticalSub = document.getElementById('kpi-critical-subtext');
+  if (criticalSub) {
+    criticalSub.innerHTML = `Active Crew: <strong>${Math.round(criticalCrewSum)} head</strong> (Critical)`;
+  }
+
   document.querySelector('#kpi-baremin .kpi-value').textContent = bareMinCount;
+  const bareminSub = document.getElementById('kpi-baremin-subtext');
+  if (bareminSub) {
+    bareminSub.innerHTML = `Active Crew: <strong>${Math.round(bareminCrewSum)} head</strong> (Severe Loss)`;
+  }
 
   // Dynamically compute and display overall manpower shortage
-  const shortage = totalStandard - totalActual;
+  const shortage = Math.round(totalStandard) - roundedActual;
   const shortagePercent = ((shortage / totalStandard) * 100).toFixed(1);
   const shortageEl = document.getElementById('kpi-shortage-badge');
   if (shortageEl) {
@@ -1221,36 +1256,6 @@ function setupEventListeners() {
       animateDotsToCurrentState();
 
       // Refresh metrics
-      renderOverallView();
-      renderStoreView();
-    });
-  }
-
-  // Sandbox Accommodation Hub placement controls
-  const sandboxBtn = document.getElementById('btn-sandbox-hub');
-  if (sandboxBtn) {
-    sandboxBtn.addEventListener('click', () => {
-      sandboxModeActive = !sandboxModeActive;
-      if (sandboxModeActive) {
-        sandboxBtn.style.background = '#ea580c'; // Highlight Orange
-        sandboxBtn.style.boxShadow = '0 4px 6px rgba(234, 88, 12, 0.3)';
-        sandboxBtn.firstElementChild.textContent = '📍 Click Map to Build Hub...';
-        document.getElementById('store-map').style.cursor = 'crosshair';
-      } else {
-        sandboxBtn.style.background = '#2563eb';
-        sandboxBtn.style.boxShadow = '0 4px 6px rgba(37, 99, 235, 0.2)';
-        sandboxBtn.firstElementChild.textContent = '🏠 Place Accommodation Hub';
-        document.getElementById('store-map').style.cursor = '';
-      }
-    });
-  }
-
-  const clearSandboxBtn = document.getElementById('btn-clear-sandbox');
-  if (clearSandboxBtn) {
-    clearSandboxBtn.addEventListener('click', () => {
-      customHubs = [];
-      clearSandboxBtn.style.display = 'none';
-      replotLeafletMap();
       calculateAndRender();
     });
   }
@@ -1587,6 +1592,35 @@ function initLeafletMap() {
   const bounds = L.latLngBounds(hubCoords);
   mapInstance.fitBounds(bounds, { padding: [50, 50] });
 
+  // Define and add Floating Custom Sandbox Control in the top-right corner
+  const SandboxControl = L.Control.extend({
+    options: {
+      position: 'topright'
+    },
+    onAdd: function(map) {
+      const div = L.DomUtil.create('div', 'leaflet-sandbox-control-panel');
+      div.style.pointerEvents = 'auto'; // ensure mouse clicks inside are intercepted by Leaflet DOM
+      div.innerHTML = `
+        <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); padding: 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0; min-width: 220px; font-family: 'Outfit', sans-serif;">
+          <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">🛠️ Sandbox Hub Creator</div>
+          <button id="btn-sandbox-hub" class="btn-primary" style="background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.375rem; transition: all 0.2s; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); width: 100%;">
+            <span>🏠 Place Accommodation Hub</span>
+          </button>
+          <button id="btn-clear-sandbox" class="btn-secondary" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: none; width: 100%;">
+            Clear Custom Hubs
+          </button>
+        </div>
+      `;
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    }
+  });
+
+  mapInstance.addControl(new SandboxControl());
+
+  // Bind sandbox controls listeners
+  bindSandboxControls();
+
   // Initial plot of default layers
   replotLeafletMap();
 
@@ -1844,4 +1878,38 @@ function startPeriodicTravelAnimations() {
       });
     }
   }, 5000); // Trigger a new reliever travel journey every 5 seconds
+}
+
+// Bind Sandbox controls in Leaflet floating panel control
+function bindSandboxControls() {
+  const sandboxBtn = document.getElementById('btn-sandbox-hub');
+  if (sandboxBtn) {
+    sandboxBtn.onclick = () => {
+      sandboxModeActive = !sandboxModeActive;
+      if (sandboxModeActive) {
+        sandboxBtn.style.background = '#ea580c'; // Highlight Orange
+        sandboxBtn.style.boxShadow = '0 4px 6px rgba(234, 88, 12, 0.3)';
+        sandboxBtn.firstElementChild.textContent = '📍 Click Map to Build Hub...';
+        document.getElementById('store-map').style.cursor = 'crosshair';
+      } else {
+        sandboxBtn.style.background = '#2563eb';
+        sandboxBtn.style.boxShadow = '0 4px 6px rgba(37, 99, 235, 0.2)';
+        sandboxBtn.firstElementChild.textContent = '🏠 Place Accommodation Hub';
+        document.getElementById('store-map').style.cursor = '';
+      }
+    };
+  }
+
+  const clearSandboxBtn = document.getElementById('btn-clear-sandbox');
+  if (clearSandboxBtn) {
+    // Show clear button only if there are custom hubs
+    clearSandboxBtn.style.display = customHubs.length > 0 ? 'inline-block' : 'none';
+    
+    clearSandboxBtn.onclick = () => {
+      customHubs = [];
+      clearSandboxBtn.style.display = 'none';
+      replotLeafletMap();
+      calculateAndRender();
+    };
+  }
 }
