@@ -1294,5 +1294,32 @@ input:checked + .slider:before {
   transition: fill 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* 3D Pulsing Leaflet Markers */
+@keyframes pulse-icon-3d {
+  0% { transform: scale(1) rotateX(12deg) rotateY(-12deg); }
+  50% { transform: scale(1.15) rotateX(12deg) rotateY(-12deg); filter: drop-shadow(4px 8px 12px rgba(0,0,0,0.45)); }
+  100% { transform: scale(1) rotateX(12deg) rotateY(-12deg); }
+}
+
+.map-hub-icon svg, .map-store-icon svg {
+  animation: pulse-icon-3d 3s infinite ease-in-out;
+  transform-origin: bottom center;
+}
+
+.map-hub-icon svg {
+  animation-duration: 2.8s;
+}
+
+.map-store-icon svg {
+  animation-duration: 3.2s;
+}
+
+/* Travel animation style */
+.travel-icon-wrapper {
+  background: transparent !important;
+  border: none !important;
+}
+
+
 
 

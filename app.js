@@ -5,6 +5,15 @@ let selectedCity = '';
 let selectedStoreId = '';
 let activeRegions = ["Delhi", "Gurgaon", "Noida", "Faridabad", "Pune", "Navi Mumbai", "Mumbai"];
 let globalRgEnabled = true;
+let customHubs = [];
+let sandboxModeActive = false;
+
+// Helper to check if relief is active for a store (global toggle or custom sandbox hub coverage)
+function isReliefActiveForStore(s) {
+  const nameClean = s.storeName.trim().toLowerCase();
+  const isCoveredByCustomHub = customHubs.some(hub => hub.members.includes(nameClean));
+  return globalRgEnabled || isCoveredByCustomHub;
+}
 
 // Sales Slabs Configuration & Requirements Mapping
 const slabsConfig = {
@@ -206,12 +215,23 @@ function renderOverallView() {
   let totalRevenueProtected = 0;
 
   storeData.forEach(s => {
-    const status = getStoreStatus(s);
-    counts[status.key]++;
+    // Determine store status based on active relief status
+    const active = isReliefActiveForStore(s);
+    const effectiveCrew = active ? s.actual : Math.max(0, s.actual - 1);
+    
+    // We compute status for counts based on effective crew size!
+    const avgStandard = 6.7;
+    const avgThreshold = 5.4;
+    const avgBareMin = 4.3;
+    let statusKey = 'critical';
+    if (effectiveCrew >= avgStandard) statusKey = 'standard';
+    else if (effectiveCrew >= avgThreshold) statusKey = 'pressure';
+    else if (effectiveCrew >= avgBareMin) statusKey = 'threshold';
+    counts[statusKey]++;
 
     // Financials
     const fin = calculateFinancials(s);
-    totalRevenueProtected += fin.salesProtected;
+    totalRevenueProtected += active ? fin.salesProtected : 0;
   });
 
   const total = storeData.length || 1;
@@ -233,8 +253,6 @@ function renderOverallView() {
   document.getElementById('bar-closed').style.width = `${(counts.closed / total) * 100}%`;
 
   // Update Financial Audit numbers in UI
-  const totalRg = storeData.reduce((acc, s) => acc + s.rgRequired, 0);
-  // Calculate average regional salary rates to get the exact program cost
   let totalRgCost = 0;
   storeData.forEach(s => {
     let salaryRate = 20000;
@@ -244,26 +262,32 @@ function renderOverallView() {
     else if (s.city === "Navi Mumbai") salaryRate = 20000;
     else if (s.city === "Faridabad") salaryRate = 18000;
     else if (s.city === "Pune") salaryRate = 16000;
-    totalRgCost += s.rgRequired * (salaryRate + 1500); // salary + 1.5k pro-rated accommodation
+    
+    // Add cost only if relief is active for this store!
+    if (isReliefActiveForStore(s)) {
+      totalRgCost += s.rgRequired * (salaryRate + 1500); // salary + 1.5k pro-rated accommodation
+    }
   });
 
-  const showCost = globalRgEnabled ? totalRgCost : 0;
-  const showProtected = globalRgEnabled ? totalRevenueProtected : 0;
-  const showROI = globalRgEnabled ? (totalRevenueProtected - totalRgCost) : -totalRevenueProtected;
+  // Add rent cost for custom sandbox hubs (₹20,000 per hub)
+  const customHubsCost = customHubs.length * 20000;
+  const showCost = totalRgCost + customHubsCost;
+  const showProtected = totalRevenueProtected;
+  const showROI = showProtected - showCost;
 
   document.getElementById('fin-salaries-saved').textContent = `₹${(showCost / 100000).toFixed(2)}L`;
-  document.getElementById('fin-salaries-saved').className = `val ${globalRgEnabled ? 'text-danger' : 'text-green'}`;
-  document.getElementById('fin-salaries-saved').nextElementSibling.textContent = globalRgEnabled ? "Roster + accommodation cost active" : "Program cost saved";
+  document.getElementById('fin-salaries-saved').className = `val ${showCost > 0 ? 'text-danger' : 'text-green'}`;
+  document.getElementById('fin-salaries-saved').nextElementSibling.textContent = showCost > 0 ? "Roster + accommodation cost active" : "Program cost saved";
 
-  document.getElementById('fin-revenue-lost').textContent = `${globalRgEnabled ? '+' : ''}₹${(showProtected / 100000).toFixed(2)}L`;
-  document.getElementById('fin-revenue-lost').className = `val ${globalRgEnabled ? 'text-green' : 'text-danger'}`;
-  document.getElementById('fin-revenue-lost').nextElementSibling.textContent = globalRgEnabled ? "Revenue protected by RGs" : "Revenue leakage active!";
+  document.getElementById('fin-revenue-lost').textContent = `${showProtected > 0 ? '+' : ''}₹${(showProtected / 100000).toFixed(2)}L`;
+  document.getElementById('fin-revenue-lost').className = `val ${showProtected > 0 ? 'text-green' : 'text-danger'}`;
+  document.getElementById('fin-revenue-lost').nextElementSibling.textContent = showProtected > 0 ? "Revenue protected by RGs" : "Revenue leakage active!";
   
   const netImpactEl = document.getElementById('fin-net-impact');
   netImpactEl.textContent = `${showROI < 0 ? '-' : '+'}₹${(Math.abs(showROI) / 100000).toFixed(2)}L`;
   if (showROI < 0) {
     netImpactEl.className = "val text-danger text-bold";
-    netImpactEl.nextElementSibling.textContent = globalRgEnabled ? "Net program deficit" : "Company-wide sales loss";
+    netImpactEl.nextElementSibling.textContent = "Company-wide sales loss";
   } else {
     netImpactEl.className = "val text-green text-bold";
     netImpactEl.nextElementSibling.textContent = "Net protected profit / benefit";
@@ -435,9 +459,12 @@ function renderStoreView() {
 
   if (!store) return;
 
-  // Read toggle simulator checkbox
+  // Read toggle simulator checkbox (synced with sandbox hub coverage)
   const toggleEl = document.getElementById('toggle-rg-sim');
-  const simEnabled = toggleEl ? toggleEl.checked : true;
+  if (toggleEl) {
+    toggleEl.checked = isReliefActiveForStore(store);
+  }
+  const simEnabled = isReliefActiveForStore(store);
 
   // Determine active crew based on simulation toggle
   const displayedCrew = simEnabled ? store.actual : Math.max(0, store.actual - 1);
@@ -896,7 +923,7 @@ function renderScatterPlot() {
     if (!activeRegions.includes(s.city)) return;
 
     const cx = xScale(s.juneSales);
-    const displayedCrew = globalRgEnabled ? s.actual : Math.max(0, s.actual - 1);
+    const displayedCrew = isReliefActiveForStore(s) ? s.actual : Math.max(0, s.actual - 1);
     const cy = yScale(displayedCrew);
     const fillColor = regionColors[s.city] || '#64748b';
     const status = getStoreStatus(s);
@@ -961,11 +988,12 @@ function renderScatterPlot() {
 function renderTooltipContent(s, fillColor, cx, cy) {
   const tooltip = document.getElementById('chart-tooltip');
   const fin = calculateFinancials(s);
+  const active = isReliefActiveForStore(s);
   
   let crewBreakdownHTML = '';
   let financialsHTML = '';
 
-  if (globalRgEnabled) {
+  if (active) {
     crewBreakdownHTML = `
       <div class="tooltip-row">
         <span>Base Daily Crew (No RG):</span>
@@ -1032,7 +1060,7 @@ function renderTooltipContent(s, fillColor, cx, cy) {
     <div class="tooltip-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
       <span style="font-size: 11px; font-weight: 700; color: var(--accent-color);">Relief Cover (Simulate)</span>
       <label class="switch" style="transform: scale(0.95); cursor: pointer;">
-        <input type="checkbox" id="toggle-tooltip-rg" ${globalRgEnabled ? 'checked' : ''}>
+        <input type="checkbox" id="toggle-tooltip-rg" ${active ? 'checked' : ''}>
         <span class="slider round"></span>
       </label>
     </div>
@@ -1193,6 +1221,35 @@ function setupEventListeners() {
       // Refresh metrics
       renderOverallView();
       renderStoreView();
+    });
+  }
+
+  // Sandbox Accommodation Hub placement controls
+  const sandboxBtn = document.getElementById('btn-sandbox-hub');
+  if (sandboxBtn) {
+    sandboxBtn.addEventListener('click', () => {
+      sandboxModeActive = !sandboxModeActive;
+      if (sandboxModeActive) {
+        sandboxBtn.style.background = '#ea580c'; // Highlight Orange
+        sandboxBtn.style.boxShadow = '0 4px 6px rgba(234, 88, 12, 0.3)';
+        sandboxBtn.firstElementChild.textContent = '📍 Click Map to Build Hub...';
+        document.getElementById('store-map').style.cursor = 'crosshair';
+      } else {
+        sandboxBtn.style.background = '#2563eb';
+        sandboxBtn.style.boxShadow = '0 4px 6px rgba(37, 99, 235, 0.2)';
+        sandboxBtn.firstElementChild.textContent = '🏠 Place Accommodation Hub';
+        document.getElementById('store-map').style.cursor = '';
+      }
+    });
+  }
+
+  const clearSandboxBtn = document.getElementById('btn-clear-sandbox');
+  if (clearSandboxBtn) {
+    clearSandboxBtn.addEventListener('click', () => {
+      customHubs = [];
+      clearSandboxBtn.style.display = 'none';
+      replotLeafletMap();
+      calculateAndRender();
     });
   }
 }
@@ -1468,31 +1525,107 @@ function initLeafletMap() {
     maxZoom: 19
   }).addTo(mapInstance);
 
+  // Map click listener for sandbox mode
+  mapInstance.on('click', (e) => {
+    if (!sandboxModeActive) return;
+
+    // Create new custom Hub at click coordinates
+    const hubId = `hub-custom-${Date.now()}`;
+    const newHub = {
+      id: hubId,
+      name: `Custom Hub Accommodation #${customHubs.length + 1}`,
+      coords: [e.latlng.lat, e.latlng.lng],
+      city: "Custom",
+      cost: 20000,
+      rgs: 3,
+      members: []
+    };
+
+    // Associate member stores within 8km coverage
+    storeData.forEach(s => {
+      const nameClean = s.storeName.trim().toLowerCase();
+      const coords = storeCoordinates[nameClean];
+      if (!coords) return;
+
+      const dist = mapInstance.distance(e.latlng, [coords.lat, coords.lng]);
+      if (dist <= 8000) { // 8 km
+        newHub.members.push(nameClean);
+      }
+    });
+
+    customHubs.push(newHub);
+
+    // Reset Sandbox state
+    sandboxModeActive = false;
+    document.getElementById('store-map').style.cursor = '';
+    const btn = document.getElementById('btn-sandbox-hub');
+    if (btn) {
+      btn.style.background = '#2563eb';
+      btn.style.boxShadow = '0 4px 6px rgba(37, 99, 235, 0.2)';
+      btn.firstElementChild.textContent = '🏠 Place Accommodation Hub';
+    }
+
+    const clearBtn = document.getElementById('btn-clear-sandbox');
+    if (clearBtn) {
+      clearBtn.style.display = 'inline-block';
+    }
+
+    // Refresh map layers and recalculate financials
+    replotLeafletMap();
+    calculateAndRender();
+  });
+
   // Fit bounds to cover all Hubs
   const hubCoords = mapHubs.map(h => h.coords);
   const bounds = L.latLngBounds(hubCoords);
   mapInstance.fitBounds(bounds, { padding: [50, 50] });
 
+  // Initial plot of default layers
+  replotLeafletMap();
+
+  // Start travel animations loop
+  startPeriodicTravelAnimations();
+}
+
+// Re-plot Map Layers (clears overlays and redraws including custom hubs)
+function replotLeafletMap() {
+  if (!mapInstance) return;
+
+  // Clear current markers, polylines, and circles
+  mapInstance.eachLayer(layer => {
+    if (layer instanceof L.Marker || layer instanceof L.Polyline || layer instanceof L.Circle) {
+      mapInstance.removeLayer(layer);
+    }
+  });
+
+  mapStoreMarkers = [];
+  const allHubs = [...mapHubs, ...customHubs];
+
   // 1. Draw Hubs and their Coverage Circles
-  mapHubs.forEach(hub => {
-    // Draw 8km coverage radius circle (blue)
+  allHubs.forEach(hub => {
+    const isCustom = hub.id.includes('custom');
+
+    // Draw 8km coverage radius circle
     L.circle(hub.coords, {
       radius: 8000, // 8 km
-      color: '#2563eb',
-      fillColor: '#3b82f6',
+      color: isCustom ? '#ea580c' : '#2563eb', // Orange for custom, blue for standard
+      fillColor: isCustom ? '#ea580c' : '#3b82f6',
       fillOpacity: 0.04,
       weight: 1,
       dashArray: '3, 4'
     }).addTo(mapInstance);
 
-    // Hub Custom Icon using L.divIcon
+    // Hub Custom Icon (Orange house for custom hubs!)
+    const hubIconHTML = isCustom 
+      ? houseSVG.replace('fill="#2563eb"', 'fill="#ea580c"').replace('fill="#1e3a8a"', 'fill="#c2410c"') 
+      : houseSVG;
+
     const hubIcon = L.divIcon({
-      html: `<div style="transform: translate(-5px, -5px);">${houseSVG}</div>`,
+      html: `<div style="transform: translate(-5px, -5px);">${hubIconHTML}</div>`,
       className: 'map-hub-icon',
       iconSize: [28, 28]
     });
 
-    // Draw Hub marker
     const hubMarker = L.marker(hub.coords, {
       icon: hubIcon,
       zIndexOffset: 1000
@@ -1500,8 +1633,8 @@ function initLeafletMap() {
 
     const hubPopupHTML = `
       <div style="font-family: 'Outfit', sans-serif; min-width: 210px; line-height: 1.45;">
-        <strong style="font-size: 13px; color: #1e3a8a; display: block; margin-bottom: 2px;">🏠 Shared Accommodation Hub</strong>
-        <span style="font-size: 11px; font-weight: 700; color: #2563eb;">${hub.name}</span>
+        <strong style="font-size: 13px; color: ${isCustom ? '#c2410c' : '#1e3a8a'}; display: block; margin-bottom: 2px;">🏠 ${isCustom ? 'Custom Relief Hub' : 'Shared Accommodation Hub'}</strong>
+        <span style="font-size: 11px; font-weight: 700; color: ${isCustom ? '#ea580c' : '#2563eb'};">${hub.name}</span>
         <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 6px 0;"/>
         <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
           <tr><td style="color: #64748b; padding: 2px 0;">Rent Cost:</td><td style="font-weight: 700; text-align: right;">₹20,000/mo</td></tr>
@@ -1509,7 +1642,7 @@ function initLeafletMap() {
           <tr><td style="color: #64748b; padding: 2px 0;">RGs Stationed:</td><td style="font-weight: 700; text-align: right;">${hub.rgs} Relievers</td></tr>
           <tr><td style="color: #64748b; padding: 2px 0;">Outlets Covered:</td><td style="font-weight: 700; text-align: right;">${hub.members.length} stores</td></tr>
         </table>
-        <div style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 8px; margin-top: 8px; font-size: 10px; font-weight: 500;">
+        <div style="background: ${isCustom ? '#fff7ed' : '#eff6ff'}; color: ${isCustom ? '#9a3412' : '#1e40af'}; border: 1px solid ${isCustom ? '#fed7aa' : '#bfdbfe'}; border-radius: 6px; padding: 6px 8px; margin-top: 8px; font-size: 10px; font-weight: 500;">
           💡 Shared geography allows relievers to travel rapidly, keeping store crew stable and preventing peak-hour menu closures.
          </div>
       </div>
@@ -1517,27 +1650,28 @@ function initLeafletMap() {
     hubMarker.bindPopup(hubPopupHTML);
   });
 
-  // 2. Draw Store Pins and connection lines
-  mapStoreMarkers = [];
+  // 2. Draw Store markers and connection lines
   storeData.forEach(s => {
     const nameClean = s.storeName.trim().toLowerCase();
     const coords = storeCoordinates[nameClean];
     if (!coords) return; // Skip if no coords mapped
 
     // Find associated Hub
-    const associatedHub = mapHubs.find(hub => hub.members.includes(nameClean));
+    const associatedHub = allHubs.find(hub => hub.members.includes(nameClean));
     if (associatedHub) {
+      const isCustom = associatedHub.id.includes('custom');
       // Draw connection polyline
       L.polyline([associatedHub.coords, [coords.lat, coords.lng]], {
-        color: '#3b82f6',
+        color: isCustom ? '#ea580c' : '#3b82f6', // Orange line for custom hubs
         weight: 1.25,
         dashArray: '3, 4',
         opacity: 0.5
       }).addTo(mapInstance);
     }
 
-    // Determine initial color based on state
-    const displayedCrew = globalRgEnabled ? s.actual : Math.max(0, s.actual - 1);
+    // Determine color based on state
+    const active = isReliefActiveForStore(s);
+    const displayedCrew = active ? s.actual : Math.max(0, s.actual - 1);
     let color = '#dc2626'; // Red
     if (displayedCrew >= 6.7) color = '#059669'; // Green
     else if (displayedCrew >= 5.4) color = '#d97706'; // Yellow
@@ -1578,7 +1712,8 @@ function updateMapMarkers() {
 
   mapStoreMarkers.forEach(item => {
     const s = item.store;
-    const displayedCrew = globalRgEnabled ? s.actual : Math.max(0, s.actual - 1);
+    const active = isReliefActiveForStore(s);
+    const displayedCrew = active ? s.actual : Math.max(0, s.actual - 1);
     
     let color = '#dc2626'; // Red
     let statusLabel = 'Critical Staffing';
@@ -1614,4 +1749,65 @@ function updateMapMarkers() {
     `;
     item.marker.setPopupContent(popupHTML);
   });
+}
+
+// Animate a custom emoji character traveling along coordinates
+function animateTravel(startCoords, endCoords, emoji) {
+  if (!mapInstance) return;
+
+  const travelIcon = L.divIcon({
+    html: `<div style="font-size: 16px; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.35); text-align: center;">${emoji}</div>`,
+    className: 'travel-icon-wrapper',
+    iconSize: [20, 20]
+  });
+
+  const marker = L.marker(startCoords, { icon: travelIcon }).addTo(mapInstance);
+
+  let steps = 50;
+  let currentStep = 0;
+  const interval = setInterval(() => {
+    currentStep++;
+    const progress = currentStep / steps;
+    // Linear coordinate interpolation
+    const lat = startCoords[0] + (endCoords[0] - startCoords[0]) * progress;
+    const lng = startCoords[1] + (endCoords[1] - startCoords[1]) * progress;
+    marker.setLatLng([lat, lng]);
+
+    if (currentStep >= steps) {
+      clearInterval(interval);
+      mapInstance.removeLayer(marker);
+    }
+  }, 35); // 1.75 seconds total travel animation time
+}
+
+// Periodically run travel animations on random active cluster links (60fps coordinate slide)
+function startPeriodicTravelAnimations() {
+  setInterval(() => {
+    // Only run if map is active and relief cover is globally simulated as active
+    if (!mapInstance || globalRgEnabled === false) return;
+
+    // Combine standard and custom hubs
+    const allHubs = [...mapHubs, ...customHubs];
+    if (allHubs.length === 0) return;
+
+    // Pick a random hub
+    const hub = allHubs[Math.floor(Math.random() * allHubs.length)];
+    if (hub.members.length === 0) return;
+
+    // Pick a random store in this hub's cluster
+    const randomMemberName = hub.members[Math.floor(Math.random() * hub.members.length)];
+    const storeMarkerObj = mapStoreMarkers.find(item => item.store.storeName.trim().toLowerCase() === randomMemberName);
+
+    if (storeMarkerObj && storeMarkerObj.coords) {
+      const storeCoords = [storeMarkerObj.coords.lat, storeMarkerObj.coords.lng];
+
+      // Phase 1: Reliever (🚗) travels from Hub Accommodation to Store
+      animateTravel(hub.coords, storeCoords, '🚗');
+
+      // Phase 2: After reliever arrives (2000ms delay), cash (💵) travels back to Hub representing protected sales
+      setTimeout(() => {
+        animateTravel(storeCoords, hub.coords, '💵');
+      }, 2000);
+    }
+  }, 4000); // Trigger a new reliever travel journey every 4 seconds
 }
