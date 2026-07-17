@@ -192,6 +192,7 @@ body {
 
 /* Specific KPI color configurations */
 .text-highlight-yellow .kpi-value { color: #b45309; } /* Darker amber for contrast */
+.text-highlight-orange .kpi-value { color: var(--status-threshold); }
 .text-highlight-red .kpi-value { color: var(--status-critical); }
 .text-highlight-darkred .kpi-value { color: var(--status-baremin); }
 

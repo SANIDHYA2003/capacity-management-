@@ -218,8 +218,8 @@ function computeSummaryCards() {
 
   document.querySelector('#kpi-stores .kpi-value').textContent = totalStores;
   document.querySelector('#kpi-standard .kpi-value').textContent = Math.round(totalStandard);
-  document.getElementById('kpi-threshold-total').textContent = `${Math.round(totalThreshold)} head`;
-  document.getElementById('kpi-baremin-total').textContent = `${Math.round(totalBareMin)} head`;
+  document.querySelector('#kpi-threshold-total-card .kpi-value').textContent = Math.round(totalThreshold);
+  document.querySelector('#kpi-baremin-total-card .kpi-value').textContent = Math.round(totalBareMin);
 
   document.querySelector('#kpi-actual .kpi-value').textContent = roundedActual;
   document.querySelector('#kpi-rg .kpi-value').textContent = totalRg;
