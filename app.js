@@ -1640,7 +1640,7 @@ function replotLeafletMap() {
 
     hubMarker.on('click', () => {
       // Zoom directly to the accommodation center
-      mapInstance.flyTo(hub.coords, 14, { animate: true, duration: 1.2 });
+      mapInstance.flyTo(hub.coords, 11, { animate: true, duration: 1.2 });
     });
 
     const hubPopupHTML = `
@@ -1702,7 +1702,7 @@ function replotLeafletMap() {
 
     marker.on('click', () => {
       // Zoom directly to the store coordinates
-      mapInstance.flyTo([coords.lat, coords.lng], 14, { animate: true, duration: 1.2 });
+      mapInstance.flyTo([coords.lat, coords.lng], 11, { animate: true, duration: 1.2 });
     });
 
     const popupHTML = `
