@@ -189,6 +189,14 @@ function computeSummaryCards() {
   document.querySelector('#kpi-rg .kpi-value').textContent = totalRg;
   document.querySelector('#kpi-critical .kpi-value').textContent = belowThresholdCount;
   document.querySelector('#kpi-baremin .kpi-value').textContent = bareMinCount;
+
+  // Dynamically compute and display overall manpower shortage
+  const shortage = totalStandard - totalActual;
+  const shortagePercent = ((shortage / totalStandard) * 100).toFixed(1);
+  const shortageEl = document.getElementById('kpi-shortage-badge');
+  if (shortageEl) {
+    shortageEl.textContent = `Shortage: -${shortage} (${shortagePercent}%)`;
+  }
 }
 
 // Render Overall View: Distribution Charts and Regional Summaries
