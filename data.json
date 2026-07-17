@@ -846,7 +846,7 @@
     "standard": 5,
     "threshold": 5,
     "bareMinimum": 5,
-    "rgRequired": 0,
+    "rgRequired": 1,
     "actual": 4,
     "operatingTime": "09AM to 04AM",
     "juneSales": 827821
@@ -870,7 +870,7 @@
     "standard": 5,
     "threshold": 5,
     "bareMinimum": 5,
-    "rgRequired": 0,
+    "rgRequired": 1,
     "actual": 4,
     "operatingTime": "09AM to 11PM",
     "juneSales": 961835
@@ -906,7 +906,7 @@
     "standard": 5,
     "threshold": 5,
     "bareMinimum": 5,
-    "rgRequired": 0,
+    "rgRequired": 1,
     "actual": 4,
     "operatingTime": "09AM to 04AM",
     "juneSales": 997883
@@ -990,7 +990,7 @@
     "standard": 6,
     "threshold": 6,
     "bareMinimum": 5,
-    "rgRequired": 0,
+    "rgRequired": 1,
     "actual": 3,
     "operatingTime": "09AM to 12AM",
     "juneSales": 1788541
@@ -1062,7 +1062,7 @@
     "standard": 7,
     "threshold": 7,
     "bareMinimum": 6,
-    "rgRequired": 0,
+    "rgRequired": 1,
     "actual": 5,
     "operatingTime": "09AM to 12AM",
     "juneSales": 1962798
@@ -1098,7 +1098,7 @@
     "standard": 7,
     "threshold": 7,
     "bareMinimum": 6,
-    "rgRequired": 0,
+    "rgRequired": 1,
     "actual": 6,
     "operatingTime": "09AM to 04AM",
     "juneSales": 2078631
@@ -1134,7 +1134,7 @@
     "standard": 8,
     "threshold": 8,
     "bareMinimum": 7,
-    "rgRequired": 0,
+    "rgRequired": 1,
     "actual": 6,
     "operatingTime": "09AM to 04AM",
     "juneSales": 2306800
