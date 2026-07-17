@@ -585,8 +585,10 @@
       </div>
       <p class="card-desc">Geographical distribution of stores showing shared Accommodation Centers (Relief Hubs). The blue circles represent the 8km radius coverage of each shared accommodation center. Dotted lines connect hubs to their associated stores, demonstrating how nearby store clusters share reliever personnel during peak hours to protect sales and reduce employee stress.</p>
       
-      <!-- Leaflet Map Container -->
-      <div id="store-map" style="width: 100%; height: 500px; border-radius: 12px; border: 1px solid var(--border-color); z-index: 1; background: #f8fafc; margin-top: 1rem;"></div>
+      <!-- Leaflet Map Container wrapped in a scrollable viewport -->
+      <div class="map-scroll-container" style="width: 100%; height: 520px; overflow: auto; border: 1px solid var(--border-color); border-radius: 12px; margin-top: 1rem; background: #f8fafc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);">
+        <div id="store-map" style="width: 1600px; height: 800px; z-index: 1;"></div>
+      </div>
     </section>
   </div>
 

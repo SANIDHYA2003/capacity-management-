@@ -1520,6 +1520,11 @@ function initLeafletMap() {
     scrollWheelZoom: false
   }).setView([20.5937, 78.9629], 5);
 
+  // Trigger invalidate size so Leaflet fits the new wider scrollable dimensions
+  setTimeout(() => {
+    mapInstance.invalidateSize();
+  }, 100);
+
   // Add CartoDB Positron Tile Layer (Premium Light Theme)
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CartoDB</a>',
@@ -1633,6 +1638,11 @@ function replotLeafletMap() {
       zIndexOffset: 1000
     }).addTo(mapInstance);
 
+    hubMarker.on('click', () => {
+      // Zoom directly to the accommodation center
+      mapInstance.flyTo(hub.coords, 14, { animate: true, duration: 1.2 });
+    });
+
     const hubPopupHTML = `
       <div style="font-family: 'Outfit', sans-serif; min-width: 210px; line-height: 1.45;">
         <strong style="font-size: 13px; color: ${isCustom ? '#c2410c' : '#1e3a8a'}; display: block; margin-bottom: 2px;">🏠 ${isCustom ? 'Custom Relief Hub' : 'Shared Accommodation Hub'}</strong>
@@ -1689,6 +1699,11 @@ function replotLeafletMap() {
     const marker = L.marker([coords.lat, coords.lng], {
       icon: storeIcon
     }).addTo(mapInstance);
+
+    marker.on('click', () => {
+      // Zoom directly to the store coordinates
+      mapInstance.flyTo([coords.lat, coords.lng], 14, { animate: true, duration: 1.2 });
+    });
 
     const popupHTML = `
       <div style="font-family: 'Outfit', sans-serif; line-height: 1.4;">
