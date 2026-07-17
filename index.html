@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Store Manpower Health & Revenue Protection Dashboard</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-icon">QSR</div>
+        <div class="header-text">
+          <h1>Store Manpower Health & Revenue Protection</h1>
+          <p class="subtitle">Operational Capability & Revenue Risk Management Portal</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div id="live-time" class="live-indicator">
+          <span class="pulse-dot"></span> Loading system status...
+        </div>
+      </div>
+    </header>
+
+    <!-- Top KPI Summary Cards -->
+    <section class="kpi-container" id="kpi-section">
+      <div class="kpi-card" id="kpi-stores">
+        <span class="kpi-label">Total Stores</span>
+        <span class="kpi-value">--</span>
+        <div class="kpi-subtext">Active outlets across cities</div>
+      </div>
+      <div class="kpi-card" id="kpi-standard">
+        <span class="kpi-label">Standard Required</span>
+        <span class="kpi-value">--</span>
+        <div class="kpi-subtext">Ideal headcount for full capacity</div>
+      </div>
+      <div class="kpi-card" id="kpi-actual">
+        <span class="kpi-label">Actual Headcount</span>
+        <span class="kpi-value">--</span>
+        <div class="kpi-subtext">Currently active staff in stores</div>
+      </div>
+      <div class="kpi-card text-highlight-yellow" id="kpi-rg">
+        <span class="kpi-label">RG Required</span>
+        <span class="kpi-value">--</span>
+        <div class="kpi-subtext">Relieving Group staffing needed</div>
+      </div>
+      <div class="kpi-card text-highlight-red" id="kpi-critical">
+        <span class="kpi-label">Below Threshold</span>
+        <span class="kpi-value">--</span>
+        <div class="kpi-subtext">Critical operational compromises active</div>
+      </div>
+      <div class="kpi-card text-highlight-darkred" id="kpi-baremin">
+        <span class="kpi-label">At Bare Minimum</span>
+        <span class="kpi-value">--</span>
+        <div class="kpi-subtext">Severe capacity & revenue loss</div>
+      </div>
+    </section>
+
+    <!-- Dashboard Body (Grid Layout) -->
+    <main class="dashboard-grid">
+      <!-- Left Panel: Interactive Store Operating Curve Graph -->
+      <section class="grid-card graph-panel">
+        <div class="card-header">
+          <h2>Store Operating Curve</h2>
+          <span class="badge">Interactive Scatter Plot</span>
+        </div>
+        <p class="card-desc">Scatter chart showing actual store manpower vs. monthly sales slab. Color coding represents operational capability zones.</p>
+        
+        <!-- Custom SVG Scatter Plot Container -->
+        <div class="chart-controls-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; background: #fff7ed; border: 1px solid #ffedd5; padding: 0.5rem 0.875rem; border-radius: 8px;">
+          <span style="font-size: 0.8125rem; font-weight: 700; color: var(--accent-color);">Global RG Relief Simulation Control</span>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">RGs Active</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-global-rg" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+        <div class="chart-wrapper">
+          <svg id="scatter-chart" viewBox="0 0 800 500" width="100%" height="100%">
+            <!-- Graph Background & Gridlines will be rendered dynamically by JS -->
+          </svg>
+          <!-- Tooltip element -->
+          <div id="chart-tooltip" class="tooltip hidden"></div>
+        </div>
+
+        <!-- Graph Legend & Color Zone Guide -->
+        <div class="legend-container">
+          <div class="legend-item">
+            <span class="legend-dot color-standard"></span>
+            <span class="legend-text">Standard (Green Zone)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot color-pressure"></span>
+            <span class="legend-text">Employee Pressure (Yellow Zone)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot color-threshold"></span>
+            <span class="legend-text">Threshold (Orange Zone)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot color-critical"></span>
+            <span class="legend-text">Critical (Red Zone)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot color-baremin"></span>
+            <span class="legend-text">Bare Minimum (Dark Red Zone)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot color-closed"></span>
+            <span class="legend-text">Store Closed (Black Zone)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Controls & Detailed View Toggles -->
+      <section class="grid-card control-panel">
+        <!-- View Navigation Tabs -->
+        <nav class="view-tabs">
+          <button class="tab-btn active" data-view="overall">Overall View</button>
+          <button class="tab-btn" data-view="city">City View</button>
+          <button class="tab-btn" data-view="store">Store View</button>
+          <button class="tab-btn" data-view="allstores">All Stores</button>
+        </nav>
+
+        <!-- Dynamic Content Panels -->
+        <div class="panel-content-wrapper">
+          
+          <!-- 1. OVERALL VIEW PANEL -->
+          <div class="view-panel active" id="panel-overall">
+            <div class="view-header">
+              <h3>Company-Wide Store Health</h3>
+              <p>Store distribution across operational capability zones</p>
+            </div>
+            
+            <!-- Custom Styled Health Distribution Progress Bars -->
+            <div class="distribution-container">
+              <div class="dist-row">
+                <div class="dist-meta">
+                  <span class="dist-name">Standard Operations</span>
+                  <span class="dist-count" id="count-standard">0</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                  <div class="progress-bar color-standard" id="bar-standard" style="width: 0%"></div>
+                </div>
+              </div>
+              
+              <div class="dist-row">
+                <div class="dist-meta">
+                  <span class="dist-name">Employee Pressure Zone</span>
+                  <span class="dist-count" id="count-pressure">0</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                  <div class="progress-bar color-pressure" id="bar-pressure" style="width: 0%"></div>
+                </div>
+              </div>
+              
+              <div class="dist-row">
+                <div class="dist-meta">
+                  <span class="dist-name">Threshold Reached</span>
+                  <span class="dist-count" id="count-threshold">0</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                  <div class="progress-bar color-threshold" id="bar-threshold" style="width: 0%"></div>
+                </div>
+              </div>
+              
+              <div class="dist-row">
+                <div class="dist-meta">
+                  <span class="dist-name">Critical (Below Threshold)</span>
+                  <span class="dist-count" id="count-critical">0</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                  <div class="progress-bar color-critical" id="bar-critical" style="width: 0%"></div>
+                </div>
+              </div>
+              
+              <div class="dist-row">
+                <div class="dist-meta">
+                  <span class="dist-name">Bare Minimum Operating</span>
+                  <span class="dist-count" id="count-baremin">0</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                  <div class="progress-bar color-baremin" id="bar-baremin" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <div class="dist-row">
+                <div class="dist-meta">
+                  <span class="dist-name">Outlets Closed</span>
+                  <span class="dist-count" id="count-closed">0</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                  <div class="progress-bar color-closed" id="bar-closed" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Financial Audit Block -->
+            <div class="financial-audit-card">
+              <h4>Manpower Deficit Financial Leakage Audit</h4>
+              <p class="section-sub">Weekly Off Relief Math: RGs cover employees' weekly offs (1 off/week). Without RGs, a store operates with 1 less crew member daily, dropping standard stores to threshold, and threshold stores to critical zones.</p>
+              
+              <div class="financial-summary-grid">
+                <div class="fin-box saving">
+                  <span class="label">Total RG Program Cost</span>
+                  <span class="val text-danger" id="fin-salaries-saved">₹0.0L</span>
+                  <span class="sub text-red">₹15-25K salary + ₹1.5K pro-rated acc. per RG</span>
+                </div>
+                <div class="fin-box loss">
+                  <span class="label">Revenue Protected by RGs</span>
+                  <span class="val text-green" id="fin-revenue-lost">+₹0.0L</span>
+                  <span class="sub text-green">Sales protected by covering weekly offs</span>
+                </div>
+                <div class="fin-box impact">
+                  <span class="label">Net Program ROI / Benefit</span>
+                  <span class="val text-green" id="fin-net-impact">+₹0.0L</span>
+                  <span class="sub text-green">Net monthly profit protected</span>
+                </div>
+              </div>
+
+              <div class="rg-roi-alert">
+                <span class="roi-icon">🛡️</span>
+                <div class="roi-text">
+                  <h5>Strategic Relief Goal: Keep Outlets Above Threshold Zone</h5>
+                  <p>Each Relieving Group (RG) guard costs <strong>₹17.5K - ₹25.5K/month</strong> (₹15-25k regional salary + ₹1.5k pro-rated accommodation), but covers weekly offs for 6 employees. This prevents stores from dropping into critical zones where grillers are closed or operating hours are reduced, protecting <strong>₹1.5 Lakhs - ₹3.5 Lakhs in sales per store</strong>. The return on investment is immediate and substantial.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- City Summary Table -->
+            <div class="card-table-wrapper">
+              <h4>Regional Overview</h4>
+              <table class="data-table" id="table-overall-cities">
+                <thead>
+                  <tr>
+                    <th>City/Region</th>
+                    <th>Stores</th>
+                    <th>Std. Req</th>
+                    <th>Act. Available</th>
+                    <th>RG Needed</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Filled dynamically by JavaScript -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 2. CITY VIEW PANEL -->
+          <div class="view-panel" id="panel-city">
+            <div class="view-header">
+              <h3>Regional Manpower Analysis</h3>
+              <p>Filter by region to audit store staffing levels</p>
+            </div>
+            
+            <!-- City Selector Dropdown -->
+            <div class="input-group">
+              <label for="city-select">Select Region/City:</label>
+              <select id="city-select" class="form-select">
+                <!-- Filled dynamically by JS -->
+              </select>
+            </div>
+
+            <!-- City Summary Stats Card -->
+            <div class="city-summary-card">
+              <h4 id="city-summary-title">Region Summary</h4>
+              <div class="city-grid">
+                <div class="city-stat-box">
+                  <span class="val" id="city-stat-stores">--</span>
+                  <span class="lbl">Stores</span>
+                </div>
+                <div class="city-stat-box">
+                  <span class="val" id="city-stat-std">--</span>
+                  <span class="lbl">Std. Req</span>
+                </div>
+                <div class="city-stat-box">
+                  <span class="val" id="city-stat-act">--</span>
+                  <span class="lbl">Act. Available</span>
+                </div>
+                <div class="city-stat-box">
+                  <span class="val text-yellow" id="city-stat-rg">--</span>
+                  <span class="lbl">RG Required</span>
+                </div>
+              </div>
+              <div class="city-progress-meta">
+                <span id="city-health-desc">Calculating health...</span>
+              </div>
+            </div>
+
+            <!-- List of Outlets in Selected City -->
+            <div class="card-table-wrapper scrollable-table">
+              <h4>Outlet Directory</h4>
+              <table class="data-table" id="table-city-stores">
+                <thead>
+                  <tr>
+                    <th>Store Name</th>
+                    <th>Slab</th>
+                    <th>Std</th>
+                    <th>Act</th>
+                    <th>RG</th>
+                    <th>Health</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Filled dynamically by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 3. STORE VIEW PANEL -->
+          <div class="view-panel" id="panel-store">
+            <div class="view-header">
+              <h3>Individual Outlet Audit</h3>
+              <p>Detailed capacity constraints and revenue compromise checklist</p>
+            </div>
+
+            <!-- Store Selector Dropdown -->
+            <div class="input-group search-group">
+              <label for="store-select">Select Store:</label>
+              <select id="store-select" class="form-select select2-style">
+                <!-- Filled dynamically by JS -->
+              </select>
+            </div>
+
+            <!-- Store Detail Dashboard -->
+            <div id="store-details-container" class="hidden">
+              <div class="store-profile-header">
+                <div>
+                  <h4 id="store-name-display">Store Name</h4>
+                  <span class="city-tag" id="store-city-display">City</span>
+                </div>
+                <span class="status-badge" id="store-status-badge">Pressure Zone</span>
+              </div>
+
+              <!-- Store Stats Grid -->
+              <div class="store-stats-grid">
+                <div class="store-stat-item">
+                  <span class="lbl">Sales Slab</span>
+                  <span class="val" id="store-slab-display">--</span>
+                </div>
+                <div class="store-stat-item">
+                  <span class="lbl">Operating Hours</span>
+                  <span class="val" id="store-hours-display">--</span>
+                </div>
+                <div class="store-stat-item">
+                  <span class="lbl">RG Required</span>
+                  <span class="val text-yellow" id="store-rg-display">--</span>
+                </div>
+              </div>
+
+              <!-- Manpower Level Bar Chart -->
+              <div class="manpower-gauge-section">
+                <h5>Manpower Headcount vs Requirements</h5>
+                <div class="gauge-bar-labels">
+                  <span>Bare Min (<span id="store-val-bm">0</span>)</span>
+                  <span>Threshold (<span id="store-val-th">0</span>)</span>
+                  <span>Standard (<span id="store-val-std">0</span>)</span>
+                </div>
+                <div class="gauge-track">
+                  <!-- Dynamic markers for bare min and threshold -->
+                  <div class="gauge-marker bm-marker" id="marker-bm" style="left: 30%"></div>
+                  <div class="gauge-marker th-marker" id="marker-th" style="left: 60%"></div>
+                  <div class="gauge-fill" id="gauge-actual-fill" style="width: 70%"></div>
+                  <div class="gauge-value-tag" id="gauge-actual-val-tag" style="left: 70%">Act: 5</div>
+                </div>
+              </div>
+
+              <!-- Operational Compromises Checklist -->
+              <div class="compromises-section">
+                <h5>Current Operational Capabilities</h5>
+                <p class="section-sub">Red icons indicate compromised capability (risk of sales and service failure)</p>
+                <ul class="checklist" id="compromises-checklist">
+                  <!-- Filled dynamically by JS -->
+                </ul>
+              </div>
+
+              <!-- Store level Revenue Loss Calculator -->
+              <div class="store-calculator-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.75rem;">
+                  <h5 style="margin: 0;">Roster Relief & Revenue Protection Calculator</h5>
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Relief Cover</span>
+                    <label class="switch">
+                      <input type="checkbox" id="toggle-rg-sim" checked>
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="calc-grid">
+                  <div class="calc-row">
+                    <span>Base Daily Crew (No RG)</span>
+                    <span id="calc-active-no-rg" class="text-bold">0 head</span>
+                  </div>
+                  <div class="calc-row">
+                    <span>RG Cover</span>
+                    <span id="calc-active-with-rg" class="text-green text-bold">0 head</span>
+                  </div>
+                  <div class="calc-row">
+                    <span>Effective Daily Crew</span>
+                    <span id="calc-compromise-level" class="text-bold">0 head</span>
+                  </div>
+                  <div class="calc-row">
+                    <span>Daily Sales Protected</span>
+                    <span id="calc-daily-protected" class="text-green text-bold">+₹0/day</span>
+                  </div>
+                  <div class="calc-row">
+                    <span>Monthly Sales Protected</span>
+                    <span id="calc-sales-leakage" class="text-green text-bold">+₹0/month</span>
+                  </div>
+                  <div class="calc-row">
+                    <span>RG Relief Cost (Pro-rated)</span>
+                    <span id="calc-salary-saved" class="text-red text-bold">₹0</span>
+                  </div>
+                  <hr class="calc-divider">
+                  <div class="calc-row highlight">
+                    <span>Net Store Relief ROI</span>
+                    <span id="calc-net-impact" class="text-green text-bold">+₹0</span>
+                  </div>
+                </div>
+                <div class="calc-recommendation" id="calc-recommendation-box">
+                  <!-- Dynamic text -->
+                </div>
+              </div>
+            </div>
+            
+            <div id="store-view-placeholder" class="placeholder-msg">
+              <p>Please select a store from the dropdown or click a dot on the operating curve scatter plot to inspect its operational health.</p>
+            </div>
+          </div>
+
+          <!-- 4. ALL STORES TABLE PANEL -->
+          <div class="view-panel" id="panel-allstores">
+            <div class="view-header">
+              <h3>Complete Store Roster</h3>
+              <p>Full table of all stores with manpower data mapped to actual employee counts</p>
+            </div>
+
+            <!-- Summary totals -->
+            <div class="allstores-summary">
+              <div class="summary-chip">
+                <span class="chip-label">Total Stores</span>
+                <span class="chip-value" id="all-total-stores">--</span>
+              </div>
+              <div class="summary-chip highlight-green">
+                <span class="chip-label">Total Standard Required</span>
+                <span class="chip-value" id="all-total-std">--</span>
+              </div>
+              <div class="summary-chip highlight-orange">
+                <span class="chip-label">Total Actual</span>
+                <span class="chip-value" id="all-total-act">--</span>
+              </div>
+              <div class="summary-chip highlight-red">
+                <span class="chip-label">Deficit</span>
+                <span class="chip-value" id="all-total-deficit">--</span>
+              </div>
+              <div class="summary-chip highlight-yellow">
+                <span class="chip-label">Total RG Required</span>
+                <span class="chip-value" id="all-total-rg">--</span>
+              </div>
+            </div>
+
+            <!-- Full store table -->
+            <div class="card-table-wrapper allstores-table-wrapper">
+              <table class="data-table" id="table-all-stores">
+                <thead>
+                  <tr>
+                    <th>S.No</th>
+                    <th>Store Name</th>
+                    <th>City</th>
+                    <th>Standard</th>
+                    <th>Actual</th>
+                    <th>Threshold</th>
+                    <th>Bare Min</th>
+                    <th>RG</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Filled dynamically by JS -->
+                </tbody>
+                <tfoot id="allstores-tfoot">
+                  <!-- Total row filled by JS -->
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Section: Dedicated RG Revenue Protection Impact Flowchart -->
+    <section class="grid-card rg-impact-section">
+      <div class="card-header">
+        <h2>RG (Relieving Group) Impact Analyzer</h2>
+        <span class="badge badge-accent">Revenue Protection Mechanism</span>
+      </div>
+      <p class="card-desc">Understanding why Relieving Group (RG) staffing is a revenue protection investment rather than a cost burden. Trace the operational failure cycle caused by manpower shortages.</p>
+      
+      <!-- Flowchart Layout -->
+      <div class="flowchart-container">
+        <div class="flow-step warning">
+          <div class="step-num">01</div>
+          <div class="step-title">Resignation / Absenteeism</div>
+          <p>Store manpower drops below standard operating headcount.</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+
+        <div class="flow-step warning">
+          <div class="step-num">02</div>
+          <div class="step-title">Threshold Reached</div>
+          <p>Minimum safe operating levels hit. Personnel overworked.</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+
+        <div class="flow-step danger">
+          <div class="step-num">03</div>
+          <div class="step-title">Griller Removed</div>
+          <p>Production bottleneck begins. Orders queue up, speed drops.</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+
+        <div class="flow-step danger">
+          <div class="step-num">04</div>
+          <div class="step-title">Menu Restrictions</div>
+          <p>High-complexity items marked sold-out. Core sales decline.</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+
+        <div class="flow-step critical">
+          <div class="step-num">05</div>
+          <div class="step-title">Revenue Leakage</div>
+          <p>Extended wait times trigger refunds. Store hours cut.</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+
+        <div class="flow-step success">
+          <div class="step-num">06</div>
+          <div class="step-title">RG Deployed</div>
+          <p>Reliever restores crew size. Kitchen capacity returns to 100%.</p>
+        </div>
+      </div>
+
+      <div class="rg-justification-box">
+        <div class="justification-header">
+          <span class="icon">💡</span>
+          <h3>Strategic Business Justification</h3>
+        </div>
+        <p>A QSR outlet requires continuous full capacity to capture peak hourly demand. Losing a griller or cashier due to a 1-2 person staff shortage results in an immediate <strong>15% to 35% drop in transaction speed (throughput)</strong>. At peak times, this wait-time threshold drives customers to competitors, causing direct, unrecoverable revenue loss. <strong>RG deployment is the firewall that prevents labor shortfalls from translating into top-line revenue leakage.</strong></p>
+      </div>
+    </section>
+
+    <!-- Geographical Store Clusters & Roster Relief Map Section -->
+    <section class="grid-card full-width map-section" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+      <div class="card-header">
+        <h2>Geographical Store Clusters & Roster Relief Map</h2>
+        <span class="badge badge-accent">Interactive Leaflet Map</span>
+      </div>
+      <p class="card-desc">Geographical distribution of stores showing shared Accommodation Centers (Relief Hubs). The blue circles represent the 8km radius coverage of each shared accommodation center. Dotted lines connect hubs to their associated stores, demonstrating how nearby store clusters share reliever personnel during peak hours to protect sales and reduce employee stress.</p>
+      
+      <!-- Leaflet Map Container -->
+      <div id="store-map" style="width: 100%; height: 500px; border-radius: 12px; border: 1px solid var(--border-color); z-index: 1; background: #f8fafc; margin-top: 1rem;"></div>
+    </section>
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- JavaScript logic files -->
+  <script src="app.js"></script>
+</body>
+</html>
