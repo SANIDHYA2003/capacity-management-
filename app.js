@@ -1658,17 +1658,17 @@ function replotLeafletMap() {
     const coords = storeCoordinates[nameClean];
     if (!coords) return; // Skip if no coords mapped
 
-    // Find associated Hub
-    const associatedHub = allHubs.find(hub => hub.members.includes(nameClean));
-    if (associatedHub) {
-      // Draw connection polyline - always blue to match the standard hubs
-      L.polyline([associatedHub.coords, [coords.lat, coords.lng]], {
-        color: '#3b82f6',
+    // Find all associated Hubs (a store can be linked to standard and custom hubs simultaneously)
+    const associatedHubs = allHubs.filter(hub => hub.members.includes(nameClean));
+    associatedHubs.forEach(hub => {
+      const isCustom = hub.id.includes('custom');
+      L.polyline([hub.coords, [coords.lat, coords.lng]], {
+        color: isCustom ? '#ea580c' : '#3b82f6', // Orange line for custom hubs, blue for standard
         weight: 1.25,
         dashArray: '3, 4',
-        opacity: 0.5
+        opacity: 0.6
       }).addTo(mapInstance);
-    }
+    });
 
     // Determine color based on state
     const active = isReliefActiveForStore(s);
